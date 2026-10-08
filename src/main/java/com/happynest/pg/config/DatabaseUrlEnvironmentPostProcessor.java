@@ -24,9 +24,17 @@ public class DatabaseUrlEnvironmentPostProcessor implements EnvironmentPostProce
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
         String databaseUrl = firstNonBlank(
                 environment.getProperty("DATABASE_URL"),
-                System.getenv("DATABASE_URL")
+                System.getenv("DATABASE_URL"),
+                environment.getProperty("database.url")
         );
+        boolean prod = environment.matchesProfiles("prod")
+                || "prod".equalsIgnoreCase(System.getenv("SPRING_PROFILES_ACTIVE"));
         if (databaseUrl == null || databaseUrl.isBlank()) {
+            if (prod) {
+                throw new IllegalStateException(
+                        "DATABASE_URL is missing. On Render: Web Service → Environment → "
+                                + "Add DATABASE_URL = Internal Database URL from happy-nest-db.");
+            }
             return;
         }
         if (!(databaseUrl.startsWith("postgres://") || databaseUrl.startsWith("postgresql://"))) {
