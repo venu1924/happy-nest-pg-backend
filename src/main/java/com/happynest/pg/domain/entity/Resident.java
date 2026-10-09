@@ -41,6 +41,10 @@ public class Resident {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal deposit;
 
+    /** Amount returned on leaving (0 = non-refundable). Null on old rows → derive from deposit. */
+    @Column(precision = 12, scale = 2)
+    private BigDecimal refundAmount;
+
     @Column(nullable = false)
     private boolean depositRefundable;
 

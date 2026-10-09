@@ -41,6 +41,9 @@ public class PastResident {
     @Column(precision = 12, scale = 2)
     private BigDecimal deposit;
 
+    @Column(precision = 12, scale = 2)
+    private BigDecimal refundAmount;
+
     private Boolean depositRefundable;
 
     @Enumerated(EnumType.STRING)

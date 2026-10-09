@@ -30,7 +30,10 @@ public class UpdateResidentRequest {
     @DecimalMin(value = "0", message = "Enter deposit amount (0 if none).")
     private BigDecimal deposit;
 
-    private Boolean depositRefundable = true;
+    @DecimalMin(value = "0", message = "Enter refund amount (0 if none).")
+    private BigDecimal refundAmount;
+
+    private Boolean depositRefundable;
 
     private String notes;
 }

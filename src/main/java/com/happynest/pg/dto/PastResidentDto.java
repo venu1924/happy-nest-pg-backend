@@ -19,6 +19,7 @@ public class PastResidentDto {
     private String lastBedId;
     private BigDecimal monthlyRent;
     private BigDecimal deposit;
+    private BigDecimal refundAmount;
     private Boolean depositRefundable;
     private SharingType sharingType;
     private String notes;

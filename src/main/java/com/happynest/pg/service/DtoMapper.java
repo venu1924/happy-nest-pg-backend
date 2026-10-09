@@ -3,6 +3,7 @@ package com.happynest.pg.service;
 import com.happynest.pg.domain.entity.*;
 import com.happynest.pg.dto.*;
 
+import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
 
@@ -35,7 +36,18 @@ public final class DtoMapper {
                 .build();
     }
 
+    public static BigDecimal resolveRefundAmount(BigDecimal refundAmount, BigDecimal deposit, Boolean refundable) {
+        if (refundAmount != null) {
+            return refundAmount;
+        }
+        if (Boolean.FALSE.equals(refundable)) {
+            return BigDecimal.ZERO;
+        }
+        return deposit != null ? deposit : BigDecimal.ZERO;
+    }
+
     public static ResidentDto toResidentDto(Resident r) {
+        BigDecimal refund = resolveRefundAmount(r.getRefundAmount(), r.getDeposit(), r.isDepositRefundable());
         return ResidentDto.builder()
                 .id(r.getId())
                 .name(r.getName())
@@ -45,13 +57,15 @@ public final class DtoMapper {
                 .bedId(r.getBedId())
                 .monthlyRent(r.getMonthlyRent())
                 .deposit(r.getDeposit())
-                .depositRefundable(r.isDepositRefundable())
+                .refundAmount(refund)
+                .depositRefundable(refund.compareTo(BigDecimal.ZERO) > 0)
                 .sharingType(r.getSharingType())
                 .notes(r.getNotes())
                 .build();
     }
 
     public static PastResidentDto toPastResidentDto(PastResident r) {
+        BigDecimal refund = resolveRefundAmount(r.getRefundAmount(), r.getDeposit(), r.getDepositRefundable());
         return PastResidentDto.builder()
                 .id(r.getId())
                 .name(r.getName())
@@ -62,7 +76,8 @@ public final class DtoMapper {
                 .lastBedId(r.getLastBedId())
                 .monthlyRent(r.getMonthlyRent())
                 .deposit(r.getDeposit())
-                .depositRefundable(r.getDepositRefundable())
+                .refundAmount(refund)
+                .depositRefundable(refund.compareTo(BigDecimal.ZERO) > 0)
                 .sharingType(r.getSharingType())
                 .notes(r.getNotes())
                 .deletionReason(r.getDeletionReason())

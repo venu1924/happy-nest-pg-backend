@@ -61,6 +61,9 @@ public class ResidentService {
         bedAssignmentService.occupyBed(room, bed, id, sharingType, req.getTripleMemberLimit());
         roomRepository.save(room);
 
+        BigDecimal deposit = req.getDeposit() != null ? req.getDeposit() : BigDecimal.ZERO;
+        BigDecimal refundAmount = resolveRefundAmount(req.getRefundAmount(), deposit, req.getDepositRefundable());
+
         Resident resident = Resident.builder()
                 .id(id)
                 .name(req.getName().trim())
@@ -69,8 +72,9 @@ public class ResidentService {
                 .roomNumber(req.getRoomNumber())
                 .bedId(req.getBedId())
                 .monthlyRent(req.getMonthlyRent())
-                .deposit(req.getDeposit() != null ? req.getDeposit() : BigDecimal.ZERO)
-                .depositRefundable(req.getDepositRefundable() == null || req.getDepositRefundable())
+                .deposit(deposit)
+                .refundAmount(refundAmount)
+                .depositRefundable(refundAmount.compareTo(BigDecimal.ZERO) > 0)
                 .sharingType(sharingType)
                 .notes(req.getNotes() != null ? req.getNotes().trim() : "")
                 .build();
@@ -97,8 +101,11 @@ public class ResidentService {
         resident.setPhone(req.getPhone().replaceAll("\\s", ""));
         resident.setJoiningDate(req.getJoiningDate());
         resident.setMonthlyRent(req.getMonthlyRent());
-        resident.setDeposit(req.getDeposit() != null ? req.getDeposit() : BigDecimal.ZERO);
-        resident.setDepositRefundable(req.getDepositRefundable() == null || req.getDepositRefundable());
+        BigDecimal deposit = req.getDeposit() != null ? req.getDeposit() : BigDecimal.ZERO;
+        BigDecimal refundAmount = resolveRefundAmount(req.getRefundAmount(), deposit, req.getDepositRefundable());
+        resident.setDeposit(deposit);
+        resident.setRefundAmount(refundAmount);
+        resident.setDepositRefundable(refundAmount.compareTo(BigDecimal.ZERO) > 0);
         if (req.getNotes() != null) {
             resident.setNotes(req.getNotes());
         }
@@ -127,6 +134,8 @@ public class ResidentService {
                 .lastBedId(resident.getBedId())
                 .monthlyRent(resident.getMonthlyRent())
                 .deposit(resident.getDeposit())
+                .refundAmount(DtoMapper.resolveRefundAmount(
+                        resident.getRefundAmount(), resident.getDeposit(), resident.isDepositRefundable()))
                 .depositRefundable(resident.isDepositRefundable())
                 .sharingType(resident.getSharingType())
                 .notes(resident.getNotes())
@@ -137,6 +146,14 @@ public class ResidentService {
         paymentRepository.deleteByResidentId(id);
         residentRepository.delete(resident);
         return new MapId(id);
+    }
+
+    private static BigDecimal resolveRefundAmount(
+            BigDecimal refundAmount, BigDecimal deposit, Boolean depositRefundable) {
+        if (refundAmount != null) {
+            return refundAmount;
+        }
+        return DtoMapper.resolveRefundAmount(null, deposit, depositRefundable);
     }
 
     private Resident findResident(String id) {
