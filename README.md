@@ -20,7 +20,7 @@ REST API for the Happy Nest PG Management frontend.
 |-------|--------|--------|
 | 1–5 | 101–112 … 501–512 | 100–500 series |
 | …01 | Single | 1 bed |
-| …02–…11 | Double | 2 beds (can be single-sharing: both beds one person) |
+| …02–…11 | Double | 2 beds. Can be single-sharing (both beds, one person) or triple-sharing (Bed C added, up to 3 people) |
 | …12 | Triple | 3 beds; optional **2 members only** (Bed C unused, full at 2) |
 
 Starts with **all rooms vacant** (seeded on first run).
@@ -95,8 +95,14 @@ Profile page should show **Data mode: API**.
 | GET | `/api/payments?month=&year=` | Payments for month |
 | GET | `/api/payments/{id}` | One payment |
 | PUT | `/api/payments/{id}/mark-paid` | Record Cash / UPI / Card |
-| GET | `/api/dashboard` | Dashboard stats |
-| GET | `/api/admin/me` | Placeholder admin (Phase 1) |
+| GET | `/api/dashboard` | Monthly residents, temporary residents, vacant beds, vacant beds (P+T), payment summary |
+| GET | `/api/temporary-residents` | Few-day stays |
+| POST | `/api/temporary-residents` | Add a temporary stay |
+| GET | `/api/temporary-residents/{id}` | One temporary stay (days left, vacate today) |
+| PUT | `/api/temporary-residents/{id}/extend` | Add extra days (`extraDays`) |
+| PUT | `/api/temporary-residents/{id}/mark-paid` | Record temporary payment |
+| DELETE | `/api/temporary-residents/{id}` | Remove temporary stay and free the bed |
+| GET | `/api/admin/me` | Current admin |
 
 CORS is enabled for `http://localhost:5173`.
 
@@ -119,6 +125,9 @@ app.auth.password=happynest@602
 
 ## Notes
 
-- Payments are **record keeping only** (Cash / UPI / Card)
-- No payment gateway
-- Not full Spring Security — simple fixed login for family admins
+- Payments are **record keeping only** (Cash / UPI / Card). No payment gateway.
+- Opening a month creates a **Pending** rent row for every monthly resident already staying, unless their joining date is after that month. Past months are left as recorded.
+- `refundAmount` is the amount returned on leaving (`0` if none). `depositRefundable` follows that amount.
+- Temporary stays are a separate table. Their beds are marked `TEMPORARY`. Monthly vacant-bed counts can ignore those beds; vacant beds (P+T) count them as taken.
+- Not full Spring Security — simple fixed login for family admins.
+- Free Render Postgres expires about 30 days after creation. See the frontend `DEPLOY.md`.
