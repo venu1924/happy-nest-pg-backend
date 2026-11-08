@@ -4,6 +4,8 @@ import com.happynest.pg.domain.entity.*;
 import com.happynest.pg.dto.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 
@@ -17,6 +19,7 @@ public final class DtoMapper {
                 .bedLabel(bed.getBedLabel())
                 .status(bed.getStatus())
                 .residentId(bed.getResidentId())
+                .occupantType(bed.getOccupantType())
                 .build();
     }
 
@@ -81,6 +84,32 @@ public final class DtoMapper {
                 .sharingType(r.getSharingType())
                 .notes(r.getNotes())
                 .deletionReason(r.getDeletionReason())
+                .build();
+    }
+
+    public static TemporaryResidentDto toTemporaryResidentDto(TemporaryResident r) {
+        LocalDate checkout = r.checkoutDate();
+        long daysLeft = checkout != null ? ChronoUnit.DAYS.between(LocalDate.now(), checkout) : 0;
+        return TemporaryResidentDto.builder()
+                .id(r.getId())
+                .name(r.getName())
+                .phone(r.getPhone())
+                .amountPerDay(r.getAmountPerDay())
+                .joiningDate(r.getJoiningDate())
+                .stayDays(r.getStayDays())
+                .checkoutDate(checkout)
+                .daysLeft((int) daysLeft)
+                .vacateToday(daysLeft == 0)
+                .roomNumber(r.getRoomNumber())
+                .bedId(r.getBedId())
+                .sharingType(r.getSharingType())
+                .amount(r.getAmount())
+                .paymentStatus(r.getPaymentStatus())
+                .paymentMethod(r.getPaymentMethod())
+                .paidDate(r.getPaidDate())
+                .receivedBy(r.getReceivedBy())
+                .notes(r.getNotes())
+                .stayType("TEMPORARY STAY")
                 .build();
     }
 

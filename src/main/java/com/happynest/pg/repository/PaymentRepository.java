@@ -12,5 +12,7 @@ public interface PaymentRepository extends JpaRepository<Payment, String> {
 
     long countByMonthAndYearAndStatus(Integer month, Integer year, PaymentStatus status);
 
+    boolean existsByResidentIdAndMonthAndYear(String residentId, Integer month, Integer year);
+
     void deleteByResidentId(String residentId);
 }

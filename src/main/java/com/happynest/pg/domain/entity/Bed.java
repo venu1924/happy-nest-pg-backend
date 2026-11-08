@@ -1,6 +1,7 @@
 package com.happynest.pg.domain.entity;
 
 import com.happynest.pg.domain.enums.BedStatus;
+import com.happynest.pg.domain.enums.OccupantType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -26,6 +27,11 @@ public class Bed {
 
     @Column(length = 64)
     private String residentId;
+
+    /** MONTHLY vs TEMPORARY occupant; null when vacant. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private OccupantType occupantType;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "room_number", nullable = false)

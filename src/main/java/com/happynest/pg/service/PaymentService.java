@@ -27,11 +27,12 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final ResidentRepository residentRepository;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<PaymentDto> getPayments(Integer month, Integer year) {
         LocalDate now = LocalDate.now();
         int m = month != null ? month : now.getMonthValue();
         int y = year != null ? year : now.getYear();
+        ensureMonthPayments(m, y);
 
         Map<String, Resident> residents = residentRepository.findAll().stream()
                 .collect(Collectors.toMap(Resident::getId, Function.identity()));
@@ -40,6 +41,36 @@ public class PaymentService {
                 .map(p -> toDto(p, residents.get(p.getResidentId())))
                 .sorted(paymentComparator())
                 .toList();
+    }
+
+    /**
+     * Carry every current monthly resident into the selected month as PENDING
+     * (current/future months only). Past months stay as recorded.
+     */
+    public void ensureMonthPayments(int month, int year) {
+        LocalDate now = LocalDate.now();
+        LocalDate monthStart = LocalDate.of(year, month, 1);
+        LocalDate currentStart = LocalDate.of(now.getYear(), now.getMonthValue(), 1);
+        if (monthStart.isBefore(currentStart)) {
+            return;
+        }
+        LocalDate monthEnd = monthStart.withDayOfMonth(monthStart.lengthOfMonth());
+        for (Resident resident : residentRepository.findAll()) {
+            if (resident.getJoiningDate() != null && resident.getJoiningDate().isAfter(monthEnd)) {
+                continue;
+            }
+            if (paymentRepository.existsByResidentIdAndMonthAndYear(resident.getId(), month, year)) {
+                continue;
+            }
+            paymentRepository.save(Payment.builder()
+                    .id("pay-" + resident.getId() + "-" + year + "-" + month)
+                    .residentId(resident.getId())
+                    .month(month)
+                    .year(year)
+                    .amount(resident.getMonthlyRent())
+                    .status(PaymentStatus.PENDING)
+                    .build());
+        }
     }
 
     @Transactional(readOnly = true)

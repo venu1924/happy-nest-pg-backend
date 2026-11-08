@@ -11,4 +11,6 @@ public class PaymentSummaryDto {
     private long paid;
     private long pending;
     private long total;
+    private long temporaryPaid;
+    private long temporaryUnpaid;
 }

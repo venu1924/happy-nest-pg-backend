@@ -50,15 +50,14 @@ public class ResidentService {
         Room room = roomRepository.findByRoomNumber(req.getRoomNumber())
                 .orElseThrow(() -> new ApiException("Room not found.", HttpStatus.NOT_FOUND));
 
-        Bed bed = room.getBeds().stream()
-                .filter(b -> b.getBedId().equals(req.getBedId()))
-                .findFirst()
-                .orElseThrow(() -> new ApiException("Bed not found.", HttpStatus.NOT_FOUND));
-
         SharingType sharingType = bedAssignmentService.resolveSharingType(room, req.getSharingType());
+        if (sharingType == SharingType.TRIPLE) {
+            bedAssignmentService.ensureTwoBedTriple(room);
+        }
+        Bed assignedBed = bedAssignmentService.ensureBed(room, req.getBedId());
         String id = "res-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
 
-        bedAssignmentService.occupyBed(room, bed, id, sharingType, req.getTripleMemberLimit());
+        bedAssignmentService.occupyBed(room, assignedBed, id, sharingType, req.getTripleMemberLimit());
         roomRepository.save(room);
 
         BigDecimal deposit = req.getDeposit() != null ? req.getDeposit() : BigDecimal.ZERO;
@@ -70,7 +69,7 @@ public class ResidentService {
                 .phone(req.getPhone().replaceAll("\\s", ""))
                 .joiningDate(req.getJoiningDate())
                 .roomNumber(req.getRoomNumber())
-                .bedId(req.getBedId())
+                .bedId(assignedBed.getBedId())
                 .monthlyRent(req.getMonthlyRent())
                 .deposit(deposit)
                 .refundAmount(refundAmount)
@@ -80,12 +79,21 @@ public class ResidentService {
                 .build();
         residentRepository.save(resident);
 
+        LocalDate join = resident.getJoiningDate() != null ? resident.getJoiningDate() : LocalDate.now();
         LocalDate now = LocalDate.now();
+        int payMonth = join.getMonthValue();
+        int payYear = join.getYear();
+        LocalDate joinMonthStart = LocalDate.of(payYear, payMonth, 1);
+        LocalDate currentStart = LocalDate.of(now.getYear(), now.getMonthValue(), 1);
+        if (joinMonthStart.isBefore(currentStart)) {
+            payMonth = now.getMonthValue();
+            payYear = now.getYear();
+        }
         Payment payment = Payment.builder()
-                .id("pay-" + id + "-" + now.getYear() + "-" + now.getMonthValue())
+                .id("pay-" + id + "-" + payYear + "-" + payMonth)
                 .residentId(id)
-                .month(now.getMonthValue())
-                .year(now.getYear())
+                .month(payMonth)
+                .year(payYear)
                 .amount(resident.getMonthlyRent())
                 .status(PaymentStatus.PENDING)
                 .build();

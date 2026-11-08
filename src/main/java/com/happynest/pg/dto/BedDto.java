@@ -1,6 +1,7 @@
 package com.happynest.pg.dto;
 
 import com.happynest.pg.domain.enums.BedStatus;
+import com.happynest.pg.domain.enums.OccupantType;
 import lombok.Builder;
 import lombok.Data;
 
@@ -11,4 +12,5 @@ public class BedDto {
     private String bedLabel;
     private BedStatus status;
     private String residentId;
+    private OccupantType occupantType;
 }

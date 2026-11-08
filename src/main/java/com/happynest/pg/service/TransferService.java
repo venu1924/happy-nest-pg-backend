@@ -48,12 +48,11 @@ public class TransferService {
         Room toRoom = roomRepository.findByRoomNumber(req.getToRoomNumber())
                 .orElseThrow(() -> new ApiException("Destination room not found.", HttpStatus.NOT_FOUND));
 
-        Bed toBed = toRoom.getBeds().stream()
-                .filter(b -> b.getBedId().equals(req.getToBedId()))
-                .findFirst()
-                .orElseThrow(() -> new ApiException("Destination bed not found.", HttpStatus.NOT_FOUND));
-
         SharingType sharingType = bedAssignmentService.resolveSharingType(toRoom, req.getSharingType());
+        if (sharingType == SharingType.TRIPLE) {
+            bedAssignmentService.ensureTwoBedTriple(toRoom);
+        }
+        Bed toBed = bedAssignmentService.ensureBed(toRoom, req.getToBedId());
         Integer fromRoomNumber = resident.getRoomNumber();
         String fromBedId = resident.getBedId();
 
