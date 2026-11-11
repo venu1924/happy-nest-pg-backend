@@ -129,12 +129,25 @@ public class PgSnapshotService {
 
         out.append("\nROOMS AND BEDS\n");
         int floor = -1;
+        StringBuilder emptyOnFloor = new StringBuilder();
         for (Room room : rooms) {
             if (room.getFloorNumber() != floor) {
+                if (floor != -1 && !emptyOnFloor.isEmpty()) {
+                    out.append("  Empty rooms: ").append(emptyOnFloor).append('\n');
+                }
                 floor = room.getFloorNumber();
+                emptyOnFloor.setLength(0);
                 out.append("Floor ").append(floor).append('\n');
             }
             long vacant = room.getBeds().stream().filter(b -> b.getStatus() == BedStatus.VACANT).count();
+            boolean occupied = room.getBeds().stream().anyMatch(b -> b.getStatus() == BedStatus.OCCUPIED);
+            if (!occupied) {
+                if (!emptyOnFloor.isEmpty()) {
+                    emptyOnFloor.append(", ");
+                }
+                emptyOnFloor.append(room.getRoomNumber()).append(" (").append(vacant).append(" beds)");
+                continue;
+            }
             out.append("  Room ").append(room.getRoomNumber())
                     .append(" type ").append(room.getType())
                     .append(" mode ").append(room.getOccupancyMode())
@@ -142,11 +155,15 @@ public class PgSnapshotService {
                     .append(" vacant beds ").append(vacant)
                     .append('\n');
             room.getBeds().stream()
+                    .filter(bed -> bed.getStatus() == BedStatus.OCCUPIED)
                     .sorted(Comparator.comparing(Bed::getBedLabel))
                     .forEach(bed -> out.append("    Bed ").append(bed.getBedLabel())
                             .append(' ').append(bed.getStatus())
                             .append(' ').append(occupant(bed, residents, temporary))
                             .append('\n'));
+        }
+        if (!emptyOnFloor.isEmpty()) {
+            out.append("  Empty rooms: ").append(emptyOnFloor).append('\n');
         }
 
         out.append("\nTRANSFERS (").append(transfers.size()).append(")\n");
@@ -173,7 +190,11 @@ public class PgSnapshotService {
         if (past.isEmpty()) {
             out.append("- none\n");
         }
+        int pastShown = 0;
         for (PastResident person : past) {
+            if (pastShown++ >= 30) {
+                break;
+            }
             out.append("- ").append(person.getName())
                     .append(" | left ").append(person.getCheckoutDate())
                     .append(" | last room ").append(person.getLastRoomNumber())

@@ -6,7 +6,9 @@ import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import reactor.util.retry.Retry;
 
+import java.time.Duration;
 import java.util.List;
 
 @Service
@@ -66,7 +68,7 @@ public class AssistantService {
                 .options(OpenAiChatOptions.builder()
                         .model(MODEL)
                         .temperature(0.2)
-                        .maxTokens(1600)
+                        .maxTokens(700)
                         .build())
                 .system(SYSTEM)
                 .user("DATA:\n" + data + "\n\nRECENT CHAT:\n" + formatHistory(history)
@@ -74,8 +76,17 @@ public class AssistantService {
                 .stream()
                 .content()
                 .filter(token -> token != null && !token.isEmpty())
+                .retryWhen(Retry.fixedDelay(1, Duration.ofSeconds(3)))
                 .switchIfEmpty(Flux.just("Data is unavailable."))
-                .onErrorResume(ex -> Flux.just("The assistant could not reply just now. Check the AI key and try again."));
+                .onErrorResume(AssistantService::busyMessage);
+    }
+
+    private static Flux<String> busyMessage(Throwable ex) {
+        String text = ex.getMessage() == null ? "" : ex.getMessage().toLowerCase();
+        if (text.contains("401") || text.contains("invalid api key") || text.contains("incorrect api key")) {
+            return Flux.just("The AI key was rejected. Check AI_API_KEY on the Render service.");
+        }
+        return Flux.just("The assistant is busy right now. Wait a few seconds and ask again.");
     }
 
     private static String formatHistory(List<AskRequest.ChatLine> history) {
