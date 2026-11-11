@@ -131,3 +131,4 @@ app.auth.password=happynest@602
 - Temporary stays are a separate table. Their beds are marked `TEMPORARY`. Monthly vacant-bed counts can ignore those beds; vacant beds (P+T) count them as taken.
 - Not full Spring Security — simple fixed login for family admins.
 - Free Render Postgres expires about 30 days after creation. See the frontend `DEPLOY.md`.
+- `POST /api/assistant/ask` with `{ "question": "..." }` answers from the current PG data using Spring AI. Set `AI_API_KEY` (Groq or another OpenAI-compatible key). Optional: `AI_MODEL`, `AI_BASE_URL`.
