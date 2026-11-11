@@ -9,11 +9,13 @@ import com.happynest.pg.domain.entity.TemporaryResident;
 import com.happynest.pg.domain.enums.BedStatus;
 import com.happynest.pg.domain.enums.OccupantType;
 import com.happynest.pg.dto.TemporaryResidentDto;
+import com.happynest.pg.domain.entity.Transfer;
 import com.happynest.pg.repository.PastResidentRepository;
 import com.happynest.pg.repository.PaymentRepository;
 import com.happynest.pg.repository.ResidentRepository;
 import com.happynest.pg.repository.RoomRepository;
 import com.happynest.pg.repository.TemporaryResidentRepository;
+import com.happynest.pg.repository.TransferRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +40,7 @@ public class PgSnapshotService {
     private final PastResidentRepository pastResidentRepository;
     private final RoomRepository roomRepository;
     private final PaymentRepository paymentRepository;
+    private final TransferRepository transferRepository;
     private final PaymentService paymentService;
 
     @Transactional
@@ -86,9 +89,9 @@ public class PgSnapshotService {
                             .append(" | deposit/advance ").append(resident.getDeposit())
                             .append(" | refund ").append(resident.getRefundAmount())
                             .append(" | ").append(current).append(" rent ")
-                            .append(nowPay == null ? "NO RECORD" : nowPay.getStatus())
+                            .append(paymentText(nowPay))
                             .append(" | ").append(previous).append(" rent ")
-                            .append(prevPay == null ? "NO RECORD" : prevPay.getStatus())
+                            .append(paymentText(prevPay))
                             .append(" | notes: ").append(blank(resident.getNotes()))
                             .append('\n');
                 });
@@ -140,6 +143,27 @@ public class PgSnapshotService {
                             .append('\n'));
         }
 
+        List<Transfer> transfers = transferRepository.findAllByOrderByTransferDateDesc();
+        out.append("\nTRANSFERS (").append(transfers.size()).append(")\n");
+        if (transfers.isEmpty()) {
+            out.append("- none\n");
+        }
+        int shown = 0;
+        for (Transfer transfer : transfers) {
+            if (shown++ >= 40) {
+                break;
+            }
+            Resident person = residents.get(transfer.getResidentId());
+            out.append("- ").append(person == null ? transfer.getResidentId() : person.getName())
+                    .append(" | ").append(transfer.getTransferDate())
+                    .append(" | from room ").append(transfer.getFromRoomNumber())
+                    .append(" bed ").append(bedLabel(transfer.getFromBedId()))
+                    .append(" to room ").append(transfer.getToRoomNumber())
+                    .append(" bed ").append(bedLabel(transfer.getToBedId()))
+                    .append(" | note: ").append(blank(transfer.getNote()))
+                    .append('\n');
+        }
+
         List<PastResident> past = pastResidentRepository.findAllByOrderByCheckoutDateDesc();
         out.append("\nPAST RESIDENTS (").append(past.size()).append(")\n");
         if (past.isEmpty()) {
@@ -176,6 +200,20 @@ public class PgSnapshotService {
         }
         Resident resident = residents.get(bed.getResidentId());
         return "MONTHLY " + (resident == null ? "unknown" : resident.getName());
+    }
+
+    private static String paymentText(Payment payment) {
+        if (payment == null) {
+            return "NO RECORD";
+        }
+        String text = String.valueOf(payment.getStatus());
+        if (payment.getPaymentMethod() != null) {
+            text += " via " + payment.getPaymentMethod();
+        }
+        if (payment.getPaidDate() != null) {
+            text += " on " + payment.getPaidDate();
+        }
+        return text;
     }
 
     private static String bedLabel(String bedId) {
