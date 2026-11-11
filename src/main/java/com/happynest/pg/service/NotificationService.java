@@ -20,6 +20,7 @@ import com.happynest.pg.repository.RoomRepository;
 import com.happynest.pg.repository.TemporaryResidentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import nl.martijndwars.webpush.Encoding;
 import nl.martijndwars.webpush.Notification;
 import nl.martijndwars.webpush.PushService;
 import nl.martijndwars.webpush.Subscription;
@@ -332,7 +333,7 @@ public class NotificationService {
                 Subscription subscription = new Subscription(
                         saved.getEndpoint(),
                         new Subscription.Keys(saved.getP256dh(), saved.getAuthKey()));
-                var response = service.send(new Notification(subscription, payload));
+                var response = service.send(new Notification(subscription, payload), Encoding.AES128GCM);
                 int status = response.getStatusLine().getStatusCode();
                 if (status == 404 || status == 410) {
                     pushSubscriptionRepository.delete(saved);
