@@ -23,7 +23,7 @@ public class AssistantController {
     @PostMapping(value = "/ask", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter ask(@Valid @RequestBody AskRequest request) {
         SseEmitter emitter = new SseEmitter(120_000L);
-        assistantService.stream(request.getQuestion()).subscribe(
+        assistantService.stream(request.getQuestion(), request.getHistory()).subscribe(
                 token -> {
                     try {
                         emitter.send(SseEmitter.event().data(token));

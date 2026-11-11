@@ -8,6 +8,7 @@ import com.happynest.pg.domain.entity.Room;
 import com.happynest.pg.domain.entity.TemporaryResident;
 import com.happynest.pg.domain.enums.BedStatus;
 import com.happynest.pg.domain.enums.OccupantType;
+import com.happynest.pg.domain.enums.PaymentStatus;
 import com.happynest.pg.dto.TemporaryResidentDto;
 import com.happynest.pg.domain.entity.Transfer;
 import com.happynest.pg.repository.PastResidentRepository;
@@ -22,10 +23,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * Compact text of everything the assistant is allowed to know.
@@ -63,12 +66,16 @@ public class PgSnapshotService {
 
         Map<String, Payment> currentPayments = paymentsByResident(current);
         Map<String, Payment> previousPayments = paymentsByResident(previous);
+        List<Room> rooms = roomRepository.findAllByOrderByRoomNumberAsc();
+        List<Transfer> transfers = transferRepository.findAllByOrderByTransferDateDesc();
+        List<PastResident> past = pastResidentRepository.findAllByOrderByCheckoutDateDesc();
 
         StringBuilder out = new StringBuilder();
         out.append("Today: ").append(today).append('\n');
         out.append("Current rent month: ").append(current).append('\n');
         out.append("Advance means the security deposit, unless the notes say otherwise.\n");
         out.append("If notes do not mention advance, say it is not recorded. Do not guess.\n\n");
+        out.append(todayGlance(today, current, residents, currentPayments, temporaryList, rooms, transfers, past));
 
         out.append("MONTHLY RESIDENTS (").append(residents.size()).append(")\n");
         if (residents.isEmpty()) {
@@ -121,7 +128,6 @@ public class PgSnapshotService {
         }
 
         out.append("\nROOMS AND BEDS\n");
-        List<Room> rooms = roomRepository.findAllByOrderByRoomNumberAsc();
         int floor = -1;
         for (Room room : rooms) {
             if (room.getFloorNumber() != floor) {
@@ -143,7 +149,6 @@ public class PgSnapshotService {
                             .append('\n'));
         }
 
-        List<Transfer> transfers = transferRepository.findAllByOrderByTransferDateDesc();
         out.append("\nTRANSFERS (").append(transfers.size()).append(")\n");
         if (transfers.isEmpty()) {
             out.append("- none\n");
@@ -164,7 +169,6 @@ public class PgSnapshotService {
                     .append('\n');
         }
 
-        List<PastResident> past = pastResidentRepository.findAllByOrderByCheckoutDateDesc();
         out.append("\nPAST RESIDENTS (").append(past.size()).append(")\n");
         if (past.isEmpty()) {
             out.append("- none\n");
@@ -180,6 +184,136 @@ public class PgSnapshotService {
                     .append('\n');
         }
         return out.toString();
+    }
+
+    private static String todayGlance(
+            LocalDate today,
+            YearMonth current,
+            Map<String, Resident> residents,
+            Map<String, Payment> currentPayments,
+            List<TemporaryResident> temporaryList,
+            List<Room> rooms,
+            List<Transfer> transfers,
+            List<PastResident> past) {
+        List<String> unpaid = new ArrayList<>();
+        int paidCount = 0;
+        for (Resident resident : residents.values()) {
+            Payment payment = currentPayments.get(resident.getId());
+            if (payment != null && payment.getStatus() == PaymentStatus.PAID) {
+                paidCount++;
+            } else {
+                unpaid.add(resident.getName() + " room " + resident.getRoomNumber());
+            }
+        }
+        unpaid.sort(String.CASE_INSENSITIVE_ORDER);
+
+        List<String> tempUnpaid = new ArrayList<>();
+        List<String> vacateToday = new ArrayList<>();
+        for (TemporaryResident stay : temporaryList) {
+            TemporaryResidentDto dto = DtoMapper.toTemporaryResidentDto(stay);
+            if (stay.getPaymentStatus() != PaymentStatus.PAID) {
+                tempUnpaid.add(stay.getName() + " room " + stay.getRoomNumber());
+            }
+            if (Boolean.TRUE.equals(dto.isVacateToday())) {
+                vacateToday.add(stay.getName() + " room " + stay.getRoomNumber());
+            }
+        }
+
+        int vacantBeds = 0;
+        int vacantIgnoringTemporary = 0;
+        int emptyRooms = 0;
+        int roomsWithFreeBed = 0;
+        Map<Integer, Integer> vacantByFloor = new TreeMap<>();
+        Map<Integer, Integer> emptyRoomsByFloor = new TreeMap<>();
+        for (Room room : rooms) {
+            int vacant = 0;
+            int temporaryOccupied = 0;
+            for (Bed bed : room.getBeds()) {
+                if (bed.getStatus() == BedStatus.VACANT) {
+                    vacant++;
+                } else if (bed.getOccupantType() == OccupantType.TEMPORARY) {
+                    temporaryOccupied++;
+                }
+            }
+            vacantBeds += vacant;
+            vacantIgnoringTemporary += vacant + temporaryOccupied;
+            vacantByFloor.merge(room.getFloorNumber(), vacant, Integer::sum);
+            if (!room.getBeds().isEmpty() && vacant == room.getBeds().size()) {
+                emptyRooms++;
+                emptyRoomsByFloor.merge(room.getFloorNumber(), 1, Integer::sum);
+            } else if (vacant > 0) {
+                roomsWithFreeBed++;
+            }
+        }
+
+        List<String> movedToday = new ArrayList<>();
+        for (Transfer transfer : transfers) {
+            if (today.equals(transfer.getTransferDate())) {
+                Resident person = residents.get(transfer.getResidentId());
+                movedToday.add((person == null ? transfer.getResidentId() : person.getName())
+                        + " to room " + transfer.getToRoomNumber());
+            }
+        }
+        List<String> leftToday = new ArrayList<>();
+        for (PastResident person : past) {
+            if (today.equals(person.getCheckoutDate())) {
+                leftToday.add(person.getName());
+            }
+        }
+
+        StringBuilder glance = new StringBuilder();
+        glance.append("TODAY AT THE PG\n");
+        glance.append("- Monthly residents: ").append(residents.size()).append('\n');
+        if (residents.isEmpty()) {
+            glance.append("- ").append(current).append(" rent: no monthly residents\n");
+        } else if (unpaid.isEmpty()) {
+            glance.append("- ").append(current).append(" rent: everyone is paid (")
+                    .append(paidCount).append(")\n");
+        } else {
+            glance.append("- ").append(current).append(" rent paid: ").append(paidCount)
+                    .append(" | unpaid: ").append(unpaid.size())
+                    .append(" | unpaid names: ").append(joinLimited(unpaid)).append('\n');
+        }
+        glance.append("- Temporary residents: ").append(temporaryList.size()).append('\n');
+        glance.append("- Temporary unpaid: ")
+                .append(tempUnpaid.isEmpty() ? "none" : joinLimited(tempUnpaid)).append('\n');
+        glance.append("- Vacate today: ")
+                .append(vacateToday.isEmpty() ? "none" : joinLimited(vacateToday)).append('\n');
+        glance.append("- Vacant beds: ").append(vacantBeds).append('\n');
+        glance.append("- Vacant beds ignoring temporary stays: ").append(vacantIgnoringTemporary).append('\n');
+        glance.append("- Fully empty rooms: ").append(emptyRooms)
+                .append(" | by floor: ").append(floorCounts(emptyRoomsByFloor)).append('\n');
+        glance.append("- Partly filled rooms that still have a free bed: ").append(roomsWithFreeBed).append('\n');
+        glance.append("- Vacant beds by floor: ").append(floorCounts(vacantByFloor)).append('\n');
+        glance.append("- Transfers today: ")
+                .append(movedToday.isEmpty() ? "none" : joinLimited(movedToday)).append('\n');
+        glance.append("- Residents who left today: ")
+                .append(leftToday.isEmpty() ? "none" : joinLimited(leftToday)).append('\n');
+        glance.append('\n');
+        return glance.toString();
+    }
+
+    private static String joinLimited(List<String> items) {
+        int limit = Math.min(items.size(), 30);
+        String joined = String.join(", ", items.subList(0, limit));
+        if (items.size() > limit) {
+            joined += ", and " + (items.size() - limit) + " more";
+        }
+        return joined;
+    }
+
+    private static String floorCounts(Map<Integer, Integer> counts) {
+        if (counts.isEmpty()) {
+            return "none";
+        }
+        StringBuilder text = new StringBuilder();
+        for (Map.Entry<Integer, Integer> entry : counts.entrySet()) {
+            if (!text.isEmpty()) {
+                text.append(", ");
+            }
+            text.append("floor ").append(entry.getKey()).append(": ").append(entry.getValue());
+        }
+        return text.toString();
     }
 
     private Map<String, Payment> paymentsByResident(YearMonth month) {
