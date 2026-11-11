@@ -1,6 +1,7 @@
 package com.happynest.pg.service;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -20,7 +21,10 @@ public class AssistantService {
             - Deposit/advance is the amount recorded. Notes may say whether advance was paid.
             - A bed is vacant when its status is VACANT.
             - Vacancies ignoring temporary stays are beds that are VACANT or occupied by TEMPORARY.
+            - Reply with the answer only. Do not describe your reasoning.
             """;
+
+    private static final String MODEL = "openai/gpt-oss-20b";
 
     private final ChatClient chatClient;
     private final PgSnapshotService snapshotService;
@@ -46,6 +50,11 @@ public class AssistantService {
             return Flux.just("Data is unavailable.");
         }
         return chatClient.prompt()
+                .options(OpenAiChatOptions.builder()
+                        .model(MODEL)
+                        .temperature(0.2)
+                        .maxTokens(800)
+                        .build())
                 .system(SYSTEM)
                 .user("DATA:\n" + data + "\n\nQUESTION:\n" + question.trim())
                 .stream()
