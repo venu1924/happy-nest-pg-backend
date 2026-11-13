@@ -99,7 +99,7 @@ public final class DtoMapper {
                 .stayDays(r.getStayDays())
                 .checkoutDate(checkout)
                 .daysLeft((int) daysLeft)
-                .vacateToday(daysLeft == 0)
+                .vacateToday(daysLeft < 0)
                 .roomNumber(r.getRoomNumber())
                 .bedId(r.getBedId())
                 .sharingType(r.getSharingType())

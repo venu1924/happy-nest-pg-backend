@@ -161,15 +161,18 @@ public class NotificationService {
             if (lastDay == null) {
                 continue;
             }
-            if (today.plusDays(1).equals(lastDay)) {
+            if (today.equals(lastDay)) {
                 add(created, "vacate-tomorrow:" + stay.getId() + ":" + lastDay, today,
-                        stay.getName() + " (temporary) should vacate tomorrow");
-            } else if (today.equals(lastDay)) {
-                add(created, "vacate-today:" + stay.getId() + ":" + lastDay, today,
-                        stay.getName() + " (temporary) should vacate today");
+                        stay.getName() + " should vacate tomorrow");
             } else if (today.isAfter(lastDay)) {
-                add(created, "stay-ended:" + stay.getId() + ":" + lastDay, today,
-                        stay.getName() + " (temporary) stay has ended");
+                add(created, "vacate-today:" + stay.getId() + ":" + today, today,
+                        stay.getName() + " should vacate today");
+            }
+            if (stay.getPaymentStatus() != PaymentStatus.PAID
+                    && stay.getJoiningDate() != null
+                    && !today.isBefore(stay.getJoiningDate())) {
+                add(created, "temp-unpaid:" + stay.getId() + ":" + today, today,
+                        stay.getName() + " (temporary) payment is pending");
             }
         }
 

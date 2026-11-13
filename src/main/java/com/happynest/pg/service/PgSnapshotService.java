@@ -119,6 +119,7 @@ public class PgSnapshotService {
                     .append(" | stay days ").append(stay.getStayDays())
                     .append(" | last day ").append(dto.getCheckoutDate())
                     .append(" | days left ").append(dto.getDaysLeft())
+                    .append(dto.getDaysLeft() != null && dto.getDaysLeft() == 0 ? " | VACATE TOMORROW" : "")
                     .append(Boolean.TRUE.equals(dto.isVacateToday()) ? " | VACATE TODAY" : "")
                     .append(" | per day ").append(stay.getAmountPerDay())
                     .append(" | total ").append(stay.getAmount())
@@ -229,11 +230,15 @@ public class PgSnapshotService {
         unpaid.sort(String.CASE_INSENSITIVE_ORDER);
 
         List<String> tempUnpaid = new ArrayList<>();
+        List<String> vacateTomorrow = new ArrayList<>();
         List<String> vacateToday = new ArrayList<>();
         for (TemporaryResident stay : temporaryList) {
             TemporaryResidentDto dto = DtoMapper.toTemporaryResidentDto(stay);
             if (stay.getPaymentStatus() != PaymentStatus.PAID) {
                 tempUnpaid.add(stay.getName() + " room " + stay.getRoomNumber());
+            }
+            if (dto.getDaysLeft() != null && dto.getDaysLeft() == 0) {
+                vacateTomorrow.add(stay.getName() + " room " + stay.getRoomNumber());
             }
             if (Boolean.TRUE.equals(dto.isVacateToday())) {
                 vacateToday.add(stay.getName() + " room " + stay.getRoomNumber());
@@ -298,6 +303,8 @@ public class PgSnapshotService {
         glance.append("- Temporary residents: ").append(temporaryList.size()).append('\n');
         glance.append("- Temporary unpaid: ")
                 .append(tempUnpaid.isEmpty() ? "none" : joinLimited(tempUnpaid)).append('\n');
+        glance.append("- Vacate tomorrow: ")
+                .append(vacateTomorrow.isEmpty() ? "none" : joinLimited(vacateTomorrow)).append('\n');
         glance.append("- Vacate today: ")
                 .append(vacateToday.isEmpty() ? "none" : joinLimited(vacateToday)).append('\n');
         glance.append("- Vacant beds: ").append(vacantBeds).append('\n');
