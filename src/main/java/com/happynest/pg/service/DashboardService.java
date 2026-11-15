@@ -64,13 +64,15 @@ public class DashboardService {
                 .map(t -> DtoMapper.toTransferDto(t, resolveName(t.getResidentId())))
                 .toList();
 
+        List<com.happynest.pg.domain.entity.Resident> people = residentRepository.findAll();
         return DashboardDto.builder()
-                .totalResidents(residentRepository.count())
+                .totalResidents(StayPlans.residentsThisMonth(people, now))
                 .temporaryResidents(temps.size())
                 .totalRooms(roomRepository.count())
                 .vacantBeds(vacantIgnoringTemp)
                 .vacantBedsPT(vacantPT)
-                .vacantBedsNextMonth(StayPlans.vacantBedsNextMonth(beds, residentRepository.findAll(), now))
+                .vacantBedsNextMonth(StayPlans.vacantBedsNextMonth(beds, people, now))
+                .residentsNextMonth(StayPlans.residentsNextMonth(people, now))
                 .pendingPayments(pending)
                 .paymentSummary(PaymentSummaryDto.builder()
                         .month(month)

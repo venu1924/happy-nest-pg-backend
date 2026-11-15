@@ -41,6 +41,38 @@ public final class StayPlans {
         return count;
     }
 
+    public static long residentsThisMonth(List<Resident> residents, LocalDate today) {
+        LocalDate thisMonthEnd = YearMonth.from(today).atEndOfMonth();
+        long count = 0;
+        for (Resident resident : residents) {
+            if (resident.getJoiningDate() == null || !resident.getJoiningDate().isAfter(thisMonthEnd)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /** People still here next month, plus people joining next month. Temporary stays are not in this list. */
+    public static long residentsNextMonth(List<Resident> residents, LocalDate today) {
+        YearMonth next = YearMonth.from(today).plusMonths(1);
+        LocalDate nextEnd = next.atEndOfMonth();
+        LocalDate thisEnd = YearMonth.from(today).atEndOfMonth();
+        long count = 0;
+        for (Resident resident : residents) {
+            LocalDate joining = resident.getJoiningDate();
+            if (joining != null && YearMonth.from(joining).equals(next)) {
+                count++;
+                continue;
+            }
+            boolean hereNow = joining == null || !joining.isAfter(thisEnd);
+            boolean leaving = resident.getVacateDate() != null && !resident.getVacateDate().isAfter(nextEnd);
+            if (hereNow && !leaving) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     public static boolean bookableForLaterJoin(Bed bed, List<Resident> residents, LocalDate joining) {
         LocalDate today = LocalDate.now();
         if (reservedNextMonth(bed, residents, today, joining.withDayOfMonth(joining.lengthOfMonth()))) {

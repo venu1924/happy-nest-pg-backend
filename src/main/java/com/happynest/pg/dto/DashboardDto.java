@@ -14,6 +14,7 @@ public class DashboardDto {
     private long vacantBeds;
     private long vacantBedsPT;
     private long vacantBedsNextMonth;
+    private long residentsNextMonth;
     private long pendingPayments;
     private PaymentSummaryDto paymentSummary;
     private List<TransferDto> recentTransfers;
