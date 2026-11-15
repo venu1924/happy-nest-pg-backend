@@ -22,4 +22,5 @@ public class ResidentDto {
     private Boolean depositRefundable;
     private SharingType sharingType;
     private String notes;
+    private LocalDate vacateDate;
 }

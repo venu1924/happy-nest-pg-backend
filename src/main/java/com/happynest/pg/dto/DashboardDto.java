@@ -13,6 +13,7 @@ public class DashboardDto {
     private long totalRooms;
     private long vacantBeds;
     private long vacantBedsPT;
+    private long vacantBedsNextMonth;
     private long pendingPayments;
     private PaymentSummaryDto paymentSummary;
     private List<TransferDto> recentTransfers;

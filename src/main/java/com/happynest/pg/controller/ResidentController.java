@@ -39,6 +39,11 @@ public class ResidentController {
         return residentService.create(request);
     }
 
+    @PutMapping("/{id}/vacate-plan")
+    public ResidentDto vacatePlan(@PathVariable String id, @RequestBody VacatePlanRequest request) {
+        return residentService.planVacate(id, request.getVacateDate());
+    }
+
     @PutMapping("/{id}")
     public ResidentDto update(@PathVariable String id, @Valid @RequestBody UpdateResidentRequest request) {
         return residentService.update(id, request);

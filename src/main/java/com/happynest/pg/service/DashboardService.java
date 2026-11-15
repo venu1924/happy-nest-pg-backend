@@ -32,6 +32,7 @@ public class DashboardService {
     private final TemporaryResidentRepository temporaryResidentRepository;
     private final PaymentService paymentService;
     private final AuthService authService;
+    private final ResidentService residentService;
 
     @Transactional
     public DashboardDto getDashboard() {
@@ -39,6 +40,7 @@ public class DashboardService {
         int month = now.getMonthValue();
         int year = now.getYear();
         paymentService.ensureMonthPayments(month, year);
+        residentService.settleMoveIns();
 
         long paid = paymentRepository.countByMonthAndYearAndStatus(month, year, PaymentStatus.PAID);
         long pending = paymentRepository.countByMonthAndYearAndStatus(month, year, PaymentStatus.PENDING);
@@ -68,6 +70,7 @@ public class DashboardService {
                 .totalRooms(roomRepository.count())
                 .vacantBeds(vacantIgnoringTemp)
                 .vacantBedsPT(vacantPT)
+                .vacantBedsNextMonth(StayPlans.vacantBedsNextMonth(beds, residentRepository.findAll(), now))
                 .pendingPayments(pending)
                 .paymentSummary(PaymentSummaryDto.builder()
                         .month(month)

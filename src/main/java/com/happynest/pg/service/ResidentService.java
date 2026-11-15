@@ -26,8 +26,9 @@ public class ResidentService {
     private final PaymentRepository paymentRepository;
     private final BedAssignmentService bedAssignmentService;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<ResidentDto> getResidents() {
+        settleMoveIns();
         return residentRepository.findAllByOrderByNameAsc().stream()
                 .map(DtoMapper::toResidentDto)
                 .toList();
@@ -56,9 +57,16 @@ public class ResidentService {
         }
         Bed assignedBed = bedAssignmentService.ensureBed(room, req.getBedId());
         String id = "res-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
-
-        bedAssignmentService.occupyBed(room, assignedBed, id, sharingType, req.getTripleMemberLimit());
-        roomRepository.save(room);
+        LocalDate today = LocalDate.now();
+        boolean laterMonth = StayPlans.joinsLaterMonth(req.getJoiningDate(), today);
+        if (laterMonth) {
+            if (!StayPlans.bookableForLaterJoin(assignedBed, residentRepository.findAll(), req.getJoiningDate())) {
+                throw new ApiException("Choose a vacant bed or someone who is leaving next month.", HttpStatus.BAD_REQUEST);
+            }
+        } else {
+            bedAssignmentService.occupyBed(room, assignedBed, id, sharingType, req.getTripleMemberLimit());
+            roomRepository.save(room);
+        }
 
         BigDecimal deposit = req.getDeposit() != null ? req.getDeposit() : BigDecimal.ZERO;
         BigDecimal refundAmount = resolveRefundAmount(req.getRefundAmount(), deposit, req.getDepositRefundable());
@@ -103,6 +111,50 @@ public class ResidentService {
     }
 
     @Transactional
+    public ResidentDto planVacate(String id, LocalDate vacateDate) {
+        Resident resident = findResident(id);
+        resident.setVacateDate(vacateDate);
+        return DtoMapper.toResidentDto(residentRepository.save(resident));
+    }
+
+    @Transactional
+    public void settleMoveIns() {
+        LocalDate today = LocalDate.now();
+        for (Resident resident : residentRepository.findAll()) {
+            if (resident.getJoiningDate() == null || resident.getJoiningDate().isAfter(today)) {
+                continue;
+            }
+            Room room = roomRepository.findByRoomNumber(resident.getRoomNumber()).orElse(null);
+            if (room == null) {
+                continue;
+            }
+            Bed bed;
+            try {
+                bed = bedAssignmentService.ensureBed(room, resident.getBedId());
+            } catch (ApiException ex) {
+                continue;
+            }
+            if (resident.getId().equals(bed.getResidentId())) {
+                continue;
+            }
+            if (bed.getStatus() == com.happynest.pg.domain.enums.BedStatus.OCCUPIED
+                    && bed.getOccupantType() != com.happynest.pg.domain.enums.OccupantType.TEMPORARY) {
+                Resident holder = bed.getResidentId() == null
+                        ? null
+                        : residentRepository.findById(bed.getResidentId()).orElse(null);
+                if (holder == null || holder.getVacateDate() == null || holder.getVacateDate().isAfter(today)) {
+                    continue;
+                }
+                bedAssignmentService.vacateBed(room, bed.getBedId());
+            } else if (bed.getStatus() == com.happynest.pg.domain.enums.BedStatus.OCCUPIED) {
+                continue;
+            }
+            bedAssignmentService.occupyBed(room, bed, resident.getId(), resident.getSharingType(), null);
+            roomRepository.save(room);
+        }
+    }
+
+    @Transactional
     public ResidentDto update(String id, UpdateResidentRequest req) {
         Resident resident = findResident(id);
         resident.setName(req.getName().trim());
@@ -126,8 +178,14 @@ public class ResidentService {
         Room room = roomRepository.findByRoomNumber(resident.getRoomNumber())
                 .orElse(null);
         if (room != null) {
-            bedAssignmentService.vacateBed(room, resident.getBedId());
-            roomRepository.save(room);
+            Bed held = room.getBeds().stream()
+                    .filter(bed -> resident.getId().equals(bed.getResidentId()))
+                    .findFirst()
+                    .orElse(null);
+            if (held != null) {
+                bedAssignmentService.vacateBed(room, held.getBedId());
+                roomRepository.save(room);
+            }
         }
 
         String reason = req != null && req.getNotes() != null ? req.getNotes().trim() : "";

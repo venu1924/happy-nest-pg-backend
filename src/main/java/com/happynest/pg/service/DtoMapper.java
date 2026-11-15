@@ -64,6 +64,7 @@ public final class DtoMapper {
                 .depositRefundable(refund.compareTo(BigDecimal.ZERO) > 0)
                 .sharingType(r.getSharingType())
                 .notes(r.getNotes())
+                .vacateDate(r.getVacateDate())
                 .build();
     }
 

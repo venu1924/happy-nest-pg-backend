@@ -4,6 +4,7 @@ import com.happynest.pg.domain.entity.AppSetting;
 import com.happynest.pg.domain.entity.Bed;
 import com.happynest.pg.domain.entity.PgNotification;
 import com.happynest.pg.domain.entity.PushSubscription;
+import com.happynest.pg.domain.entity.Resident;
 import com.happynest.pg.domain.entity.Room;
 import com.happynest.pg.domain.entity.TemporaryResident;
 import com.happynest.pg.domain.enums.BedStatus;
@@ -173,6 +174,26 @@ public class NotificationService {
                     && !today.isBefore(stay.getJoiningDate())) {
                 add(created, "temp-unpaid:" + stay.getId() + ":" + today, today,
                         stay.getName() + " (temporary) payment is pending");
+            }
+        }
+
+        for (Resident resident : residentRepository.findAll()) {
+            String advance = NoteNotices.advanceDue(resident, today);
+            if (advance != null) {
+                add(created, "advance-due:" + resident.getId() + ":" + today, today, advance);
+            }
+            String remainder = NoteNotices.rentRemainder(resident, today);
+            if (remainder != null) {
+                add(created, "rent-rest:" + resident.getId() + ":" + today, today, remainder);
+            }
+            if (resident.getVacateDate() != null) {
+                if (today.equals(resident.getVacateDate().minusDays(1))) {
+                    add(created, "leave-tomorrow:" + resident.getId() + ":" + resident.getVacateDate(), today,
+                            NoteNotices.vacate(resident.getName(), false, resident.getRefundAmount()));
+                } else if (!today.isBefore(resident.getVacateDate())) {
+                    add(created, "leave-today:" + resident.getId() + ":" + today, today,
+                            NoteNotices.vacate(resident.getName(), true, resident.getRefundAmount()));
+                }
             }
         }
 

@@ -54,4 +54,7 @@ public class Resident {
 
     @Column(length = 500)
     private String notes;
+
+    /** Set from resident details when this person will leave. */
+    private LocalDate vacateDate;
 }
