@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/notifications")
 @RequiredArgsConstructor
@@ -24,6 +26,13 @@ public class NotificationController {
     @GetMapping
     public NotificationView.ListResult list() {
         return notificationService.current();
+    }
+
+    /** Wakes the server at 9 AM and 7 PM so phone alerts go out while the app is closed. */
+    @GetMapping("/dispatch")
+    public Map<String, String> dispatch() {
+        notificationService.refresh();
+        return Map.of("status", "ok");
     }
 
     @PostMapping("/{id}/read")

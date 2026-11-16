@@ -10,8 +10,13 @@ public class MorningNotificationJob {
 
     private final NotificationService notificationService;
 
-    @Scheduled(cron = "0 0 8 * * *", zone = "Asia/Kolkata")
+    @Scheduled(cron = "0 0 9 * * *", zone = "Asia/Kolkata")
     public void morning() {
+        notificationService.refresh();
+    }
+
+    @Scheduled(cron = "0 0 19 * * *", zone = "Asia/Kolkata")
+    public void evening() {
         notificationService.refresh();
     }
 }

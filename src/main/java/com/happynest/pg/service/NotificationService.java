@@ -74,8 +74,11 @@ public class NotificationService {
     @Value("${app.notify.zone:Asia/Kolkata}")
     private String zoneId;
 
-    @Value("${app.notify.morning-hour:8}")
+    @Value("${app.notify.morning-hour:9}")
     private int morningHour;
+
+    @Value("${app.notify.evening-hour:19}")
+    private int eveningHour;
 
     @Value("${app.notify.rent-day:6}")
     private int rentDay;
@@ -106,8 +109,40 @@ public class NotificationService {
                 state.put(INIT, "true");
             }
             saveState(state);
-            created.forEach(this::push);
+            deliverDueSlot(today, now, state);
         }
+    }
+
+    /**
+     * Sends today's alerts once at 9 AM and once at 7 PM.
+     * Opening the app later does not send them again.
+     */
+    private void deliverDueSlot(LocalDate today, ZonedDateTime now, Map<String, String> state) {
+        String slot = now.getHour() >= eveningHour ? "evening" : now.getHour() >= morningHour ? "morning" : null;
+        if (slot == null) {
+            return;
+        }
+        String key = "push." + slot + "." + today;
+        if (state.containsKey(key)) {
+            return;
+        }
+        List<PgNotification> todays = notificationRepository.findByNoticeDate(today);
+        if (!todays.isEmpty() && !pushAll(todays)) {
+            return;
+        }
+        state.put(key, "true");
+        saveState(state);
+    }
+
+    private boolean pushAll(List<PgNotification> notices) {
+        if (pushSubscriptionRepository.count() == 0 || pushClient() == null) {
+            return pushSubscriptionRepository.count() == 0;
+        }
+        boolean delivered = false;
+        for (PgNotification notice : notices) {
+            delivered = push(notice) || delivered;
+        }
+        return delivered;
     }
 
     @Transactional(readOnly = true)
@@ -341,17 +376,15 @@ public class NotificationService {
         created.add(notificationRepository.save(notice));
     }
 
-    private void push(PgNotification notice) {
+    private boolean push(PgNotification notice) {
         List<PushSubscription> subscriptions = pushSubscriptionRepository.findAll();
-        if (subscriptions.isEmpty()) {
-            return;
-        }
         PushService service = pushClient();
-        if (service == null) {
-            return;
+        if (subscriptions.isEmpty() || service == null) {
+            return false;
         }
         String payload = "{\"title\":\"Happy Nest\",\"body\":" + quote(notice.getMessage())
                 + ",\"url\":\"/notifications\"}";
+        boolean delivered = false;
         for (PushSubscription saved : subscriptions) {
             try {
                 Subscription subscription = new Subscription(
@@ -361,11 +394,14 @@ public class NotificationService {
                 int status = response.getStatusLine().getStatusCode();
                 if (status == 404 || status == 410) {
                     pushSubscriptionRepository.delete(saved);
+                } else if (status >= 200 && status < 300) {
+                    delivered = true;
                 }
             } catch (Exception ex) {
                 log.warn("Push failed: {}", ex.getMessage());
             }
         }
+        return delivered;
     }
 
     private PushService pushClient() {
@@ -454,9 +490,12 @@ public class NotificationService {
     }
 
     private String morningLabel() {
-        int hour = morningHour % 12 == 0 ? 12 : morningHour % 12;
-        String suffix = morningHour < 12 ? "AM" : "PM";
-        return hour + ":00 " + suffix;
+        return clockLabel(morningHour) + " and " + clockLabel(eveningHour);
+    }
+
+    private static String clockLabel(int hour24) {
+        int hour = hour24 % 12 == 0 ? 12 : hour24 % 12;
+        return hour + ":00 " + (hour24 < 12 ? "AM" : "PM");
     }
 
     private static int parseInt(String value) {
